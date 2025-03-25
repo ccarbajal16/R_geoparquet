@@ -1,0 +1,92 @@
+---
+author: "Carlos Carbajal"
+date: now
+title: "Geoparquet with R"
+format: 
+    html:
+     number-sections: true
+     toc: true
+     toc-depth: 3
+     code-fold: false
+     code-tools: true
+     highlight-style: github
+     theme: cosmo
+     self-contained: true
+---
+
+## Introduction
+
+This is a simple example of how to use the `sf` package to read and write geoparquet files.
+
+```{r}
+library(sf)
+library(sfarrow)
+
+# Read geoparquet file
+sf <- st_read_parquet('data/transp_sjl_utm.parquet')
+
+# Plot geoparquet file
+plot(sf::st_geometry(sf))
+```
+
+A example how use with `dplyr`
+
+```{r}
+library(dplyr)
+
+road_sjl <- sf|>
+    filter(names.primary == 'Avenida Santa Rosa de Lima') |>
+    mutate(id = row_number()) |>
+    select(id, subtype, class) |>
+    st_set_crs(32718)
+
+plot(sf::st_geometry(road_sjl))
+```
+
+Export to geoparquet file
+
+```{r}
+
+st_write_parquet(road_sjl, 'outputs/select_road_sjl.parquet')  
+```
+
+Other example with dplyr 
+
+```{r}
+groups <- sf |>
+    filter(subtype == 'road') |>
+    group_by(class) |>
+    summarize(Total = n_distinct(row_number())) |>
+    st_drop_geometry() |>
+    write.csv('outputs/table_summary.csv')
+
+```
+
+A example how use with `sf`
+
+```{r}
+sf_new <- road_sjl |>
+    mutate(length = st_length(geometry)) |>
+    st_buffer(100)
+
+plot(sf::st_geometry(sf_new))
+
+st_write_parquet(sf_new, 'outputs/buffer_road.parquet') 
+```
+
+A example how use with `tidyverse`
+
+```{r}
+library(tidyverse)
+data <- st_read_parquet('outputs/buffer_road.parquet')
+
+data_plot <- data %>% 
+    ggplot() +
+    geom_sf() +
+    ggtitle('Buffer 100m') +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    coord_sf() +
+    theme_minimal()
+
+ggsave('outputs/example_plot.png', data_plot, width = 10, height = 10, dpi = 300)
+```
